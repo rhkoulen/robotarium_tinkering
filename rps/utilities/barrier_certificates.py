@@ -1,12 +1,10 @@
 from cvxopt import matrix
-from cvxopt.blas import dot
 from cvxopt.solvers import qp, options
 from cvxopt import matrix, sparse
 
 # Unused for now, will include later for speed.
 # import quadprog as solver2
 
-import itertools
 import numpy as np
 from scipy.special import comb
 
@@ -18,6 +16,7 @@ options['show_progress'] = False
 options['reltol'] = 1e-2 # was e-2
 options['feastol'] = 1e-2 # was e-4
 options['maxiters'] = 50 # default is 100
+
 
 def create_single_integrator_barrier_certificate(barrier_gain=100, safety_radius=0.17, magnitude_limit=0.2):
     """Creates a barrier certificate for a single-integrator system.  This function

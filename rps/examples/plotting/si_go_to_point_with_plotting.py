@@ -5,7 +5,6 @@ from rps.utilities.misc import *
 from rps.utilities.controllers import *
 
 import numpy as np
-import time
 
 # Instantiate Robotarium object
 N = 5
