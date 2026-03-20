@@ -16,7 +16,7 @@ The installation instructions on the source repo are outdated (as of 2 March 202
 You win! If you don't want my build and want your own, you need matplotlib, cvxopt, scipy>=0.18, and numpy<2. Then `pip install -e .` to get the rps module built.
 
 ## My Stuff
-You can find the stuff that I made in `.\rps\experiments\`
+You can find the stuff that I made in `.\experiments\`
 
 
 
