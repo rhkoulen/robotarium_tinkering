@@ -24,7 +24,7 @@ inner_box_x_rad = 0.42195 # half width of the inner rectangle
 inner_box_y_rad = 0.365 # half height of the inner rectangle
 
 # Instantiate Robotarium object
-iters = 500
+iters = 10000
 N_boids = 16
 initial_conditions = np.array([
     [-0.45, path_radius+0.1, 0],
@@ -57,15 +57,28 @@ r = robotarium.Robotarium(number_of_robots=N_boids, show_figure=True, initial_co
 r.axes.add_patch(Rectangle(xy=(-inner_box_x_rad, -inner_box_y_rad), width=inner_box_x_rad*2, height=inner_box_y_rad*2, color="#074614", lw=0, zorder=0))
 r.axes.add_patch(Circle(xy=(inner_box_x_rad, 0.0), radius=inner_box_y_rad, color="#074614", lw=0, zorder=0))
 r.axes.add_patch(Circle(xy=(-inner_box_x_rad, 0.0), radius=inner_box_y_rad, color="#074614", lw=0, zorder=0))
-r.axes.add_patch(Arc(xy=(inner_box_x_rad, 0.0), width=path_radius*2, height=path_radius*2, theta1=-90, theta2=90, color="#000000", lw=2))
-r.axes.add_patch(Arc(xy=(-inner_box_x_rad, 0.0), width=path_radius*2, height=path_radius*2, theta1=90, theta2=270, color="#000000", lw=2))
-r.axes.plot([-inner_box_x_rad, inner_box_x_rad], [-path_radius, -path_radius], color="#000000", lw=2)
-r.axes.plot([-inner_box_x_rad, inner_box_x_rad], [path_radius, path_radius], color="#000000", lw=2)
+r.axes.add_patch(Arc(xy=(inner_box_x_rad, 0.0), width=path_radius*2, height=path_radius*2, theta1=-90, theta2=90, color="#000000", lw=2, zorder=0))
+r.axes.add_patch(Arc(xy=(-inner_box_x_rad, 0.0), width=path_radius*2, height=path_radius*2, theta1=90, theta2=270, color="#000000", lw=2, zorder=0))
+r.axes.plot([-inner_box_x_rad, inner_box_x_rad], [-path_radius, -path_radius], color="#000000", lw=2, zorder=0)
+r.axes.plot([-inner_box_x_rad, inner_box_x_rad], [path_radius, path_radius], color="#000000", lw=2, zorder=0)
 
 # Create controllers
 si_barrier_cert = create_single_integrator_barrier_certificate_with_boundary()
 # _, uni_to_si_states = create_si_to_uni_mapping() # whart does this used for idkkk
-si_to_uni_dyn = create_si_to_uni_dynamics_with_backwards_motion()
+si_to_uni_dyn = create_si_to_uni_dynamics()
+def threshold_wheel_speeds(dxu, wheel_radius, base_length, max_wheel_velocity):
+    # Compute wheel speeds
+    dxdd = np.vstack((
+        (2*dxu[0,:] - base_length*dxu[1,:]) / (2*wheel_radius),
+        (2*dxu[0,:] + base_length*dxu[1,:]) / (2*wheel_radius)
+    ))
+    
+    # How much does each robot exceed the limit?
+    max_per_robot = np.max(np.abs(dxdd), axis=0)
+    scale = np.minimum(1.0, max_wheel_velocity / (max_per_robot + 1e-8))
+    
+    return dxu * scale[None, :]
+
 def compute_racing_force(positions:np.ndarray) -> np.ndarray:
     """
     We want a force that nudges boids to race.
@@ -76,45 +89,49 @@ def compute_racing_force(positions:np.ndarray) -> np.ndarray:
 
     2. Add a force along the clockwise direction, some short amount along the tangent.
     """
+    x = positions[0, :] # (N,)
+    y = positions[1, :] # (N,)
 
     racing_force = np.zeros_like(positions)
-    for n in range(positions.shape[1]):
-        position = positions[:, n]
-        if position[0] < -inner_box_x_rad:
-            # The left candidate will the closest point on the left semicircle arc
-            center = np.array((-inner_box_x_rad, 0.0))
-            disp = position - center
-            unit = disp / np.sqrt(np.sum(disp ** 2))
-            candidate = center + unit * path_radius
 
-            centering_force = candidate - position
-            tangent_force = np.array([unit[1], -unit[0]]) * path_tangent_nudge
-            force = centering_force + tangent_force
-        elif position[0] <= inner_box_x_rad:
-            # The middle candidate will be on one of the line segments
-            if position[1] >= 0.0:
-                candidate = np.array([position[0], path_radius])
+    # Masks for each region
+    left  = x < -inner_box_x_rad
+    right = x >  inner_box_x_rad
+    mid   = ~left & ~right
 
-                centering_force = candidate - position
-                tangent_force = np.array([path_tangent_nudge, 0])
-                force = centering_force + tangent_force
-            else:
-                candidate = np.array([position[0], -path_radius])
+    # --- Left semicircle ---
+    if left.any():
+        cx, cy = -inner_box_x_rad, 0.0
+        disp = positions[:, left] - np.array([[cx], [cy]])
+        unit = disp / (np.linalg.norm(disp, axis=0, keepdims=True) + 1e-8)
+        candidate = np.array([[cx], [cy]]) + unit * path_radius
+        centering = candidate - positions[:, left]
+        tangent = np.stack([unit[1], -unit[0]]) * path_tangent_nudge
+        racing_force[:, left] = centering + tangent
 
-                centering_force = candidate - position
-                tangent_force = np.array([-path_tangent_nudge, 0])
-                force = centering_force + tangent_force
-        else:
-            # The right candidate will the closest point on the right semicircle arc
-            center = np.array((inner_box_x_rad, 0.0))
-            disp = position - center
-            unit = disp / np.sqrt(np.sum(disp ** 2))
-            candidate = center + unit * path_radius
+    # --- Right semicircle ---
+    if right.any():
+        cx, cy = inner_box_x_rad, 0.0
+        disp = positions[:, right] - np.array([[cx], [cy]])
+        unit = disp / (np.linalg.norm(disp, axis=0, keepdims=True) + 1e-8)
+        candidate = np.array([[cx], [cy]]) + unit * path_radius
+        centering = candidate - positions[:, right]
+        tangent = np.stack([unit[1], -unit[0]]) * path_tangent_nudge
+        racing_force[:, right] = centering + tangent
 
-            centering_force = candidate - position
-            tangent_force = np.array([unit[1], -unit[0]]) * path_tangent_nudge
-            force = centering_force + tangent_force
-        racing_force[:, n] = force
+    # --- Middle: top and bottom ---
+    top = mid & (y >= 0)
+    bot = mid & (y <  0)
+
+    if top.any():
+        centering = np.array([[0.0], [path_radius]]) - positions[:, top]
+        centering[0, :] = 0  # x component already zero by construction
+        racing_force[:, top] = centering + np.array([[path_tangent_nudge], [0]])
+
+    if bot.any():
+        centering = np.array([[0.0], [-path_radius]]) - positions[:, bot]
+        centering[0, :] = 0
+        racing_force[:, bot] = centering + np.array([[-path_tangent_nudge], [0]])
 
     return racing_force
 def boids_velocities(x:np.ndarray, past_velos:np.ndarray) -> np.ndarray:
@@ -168,9 +185,12 @@ for _ in range(iters):
     dxi_safe = si_barrier_cert(dxi, x[:2, :]) # safety layer
     dxu = si_to_uni_dyn(dxi_safe, x) # convert to unicycle [v; ω]
 
+    # Can't trust the unicycle dynamics to not overrun the actuators
+    dxu_safe = threshold_wheel_speeds(dxu, r.wheel_radius, r.base_length, r.max_wheel_velocity)
+
     # Set and iterate
     past_velocities = dxi_safe
-    r.set_velocities(np.arange(N_boids), dxu)
+    r.set_velocities(np.arange(N_boids), dxu_safe)
     r.step()
 
 
