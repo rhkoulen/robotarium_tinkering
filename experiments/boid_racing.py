@@ -27,23 +27,23 @@ inner_box_y_rad = 0.365 # half height of the inner rectangle
 iters = 10000
 N_boids = 16
 initial_conditions = np.array([
-    [-0.45, path_radius+0.1, 0],
-    [-0.45, path_radius-0.1, 0],
-    [-0.15, path_radius+0.1, 0],
-    [-0.15, path_radius-0.1, 0],
-    [ 0.15, path_radius+0.1, 0],
-    [ 0.15, path_radius-0.1, 0],
-    [ 0.45, path_radius+0.1, 0],
-    [ 0.45, path_radius-0.1, 0],
+    [-0.60, path_radius, 0],
+    [-0.60, path_radius-0.40, 0],
+    [-0.20, path_radius, 0],
+    [-0.20, path_radius-0.40, 0],
+    [ 0.20, path_radius, 0],
+    [ 0.20, path_radius-0.40, 0],
+    [ 0.60, path_radius, 0],
+    [ 0.60, path_radius-0.40, 0],
 
-    [-0.45, -path_radius+0.1, np.pi],
-    [-0.45, -path_radius-0.1, np.pi],
-    [-0.15, -path_radius+0.1, np.pi],
-    [-0.15, -path_radius-0.1, np.pi],
-    [ 0.15, -path_radius+0.1, np.pi],
-    [ 0.15, -path_radius-0.1, np.pi],
-    [ 0.45, -path_radius+0.1, np.pi],
-    [ 0.45, -path_radius-0.1, np.pi],
+    [-0.60, -path_radius+0.40, np.pi],
+    [-0.60, -path_radius, np.pi],
+    [-0.20, -path_radius+0.40, np.pi],
+    [-0.20, -path_radius, np.pi],
+    [ 0.20, -path_radius+0.40, np.pi],
+    [ 0.20, -path_radius, np.pi],
+    [ 0.60, -path_radius+0.40, np.pi],
+    [ 0.60, -path_radius, np.pi],
 ]).T
 initial_velocities = np.zeros(shape=(2,N_boids))
 initial_velocities[0,:8] = 0.12
